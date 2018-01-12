@@ -18,11 +18,11 @@
 -- ------------------------------------------------------------------------- --
 
 local args =  {
-  ['host'] = '192.168.0.10',
+  ['host'] = 'localhost',
   ['id'] = 'mqtt_pub_notebook',
-  ['message'] = 'saddads',
+  ['message'] = 'teste123',
   ['port'] = 1883,
-  ['topic'] = 'Sensor_Data',
+  ['topic'] = '/teste',
   ['will_message'] = '.',
   ['will_qos'] = 0,
   ['will_retain'] = 0,
@@ -43,6 +43,9 @@ local args =  {
 ]]
 
 local MQTT = require("mqtt_library")
+local json_lua = require("json_lua")
+
+args.message = json_lua.encode({ 1, 2, 3, { x = 10 } })
 
 if (args.debug) then MQTT.Utility.set_debug(true) end
 

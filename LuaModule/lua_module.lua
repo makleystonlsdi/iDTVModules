@@ -1,42 +1,37 @@
+local json = require("json_lua")
 local lua_module = {}
 
 -- Tables
-local tableSmartObjects = {}
-local tablePortableDevices = {}
-local tableInteractions = {}
-
--- Global variables
-local sepCharTopic = "/"
-local sepCharMsg = "&";
-local timeActivePortableDevices = 20
+local smartObjectsTable = {}
+local portableDevicesTable = {}
+local interactionsTable = {}
+local topicsTable = {}
 
 -- MQTT Settings
 local mqtt_settings ={
-		['host'] = "",
-	  	['id'] = "iDTV",
-	 	['message'] = "",
-	  	['port'] = 1883,
-	  	['topic_sub'] = "/#",
-	  	['topic_pub'] = "/",
-	  	['will_message'] = ".",
-	  	['will_qos'] = 0,
-	  	['will_retain'] = 0,
-	  	['will_topic'] = "."
-	  } 
+		['host_mhubtv'] = "",
+	  ['id'] = "iDTV",
+	  ['port'] = 1883,
+	  ['topic_sub'] = "/#",
+	  ['topic_pub'] = "/reservedtopic/test",
+    ['topic_separator_character'] = "/",
+    ['message_separator_character'] = "&",
+    ['time_active_portable_devices'] = 20 --seconds
+  } 
 
 -- *******************************************
 -- ****** Global methods of this module ******
 -- *******************************************
 function split(inputstr, sep)
-        if sep == nil then
-                sep = "%s"
-        end
-        local t={} ; i=1
-        for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
-                t[i] = str
-                i = i + 1
-        end
-        return t
+  if sep == nil then
+          sep = "%s"
+  end
+  local t={} ; i=1
+  for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+          t[i] = str
+          i = i + 1
+  end
+  return t
 end
 
 function updateDateTime(table, indexObj)
@@ -45,14 +40,15 @@ function updateDateTime(table, indexObj)
 end
 
 --If is alive then it returns true, if it does not return false
-function calcClock(clockInit, clockEnd)
-	if(clockEnd - clockInit) <= timeActivePortableDevices then
+function calcDiffClock(clockInit, clockEnd)
+	if(clockEnd - clockInit) <= mqtt_settings.time_active_portable_devices then
 		return true
 	else
 		return false
 	end
 end
 
+-- Set MQTT Settings
 function lua_module.setMqttSettings(settings)
 	for k,v in pairs(settings) do
 		mqtt_settings[k] = v
@@ -66,40 +62,49 @@ end
 
 
 
+
+
 -- **************************************
 -- ****** Methods to Smart Objects ******
 -- **************************************
-function lua_module.getTableSmartObject()
-	return tableSmartObjects
+function lua_module.getSmartObjectsTable()
+	return smartObjectsTable
 end
---Returned the index of smar object in table
-function lua_module.searchSmartObject(mac)
-	for k,v in pairs(tableSmartObjects) do
-		if(mac == v.mac) then
+--Returned the index of smart object in table
+function getIndexSmartObjectById(id)
+	for k,v in pairs(smartObjectsTable) do
+    --print(id..' - '..v.ID)
+		if(id == v.ID) then
 			return k
 		end
 	end
 	return nil
 end
 
-function lua_module.getTableSmartObject()
-	return tableSmartObjects
+--Returned the indexs of smart objects in table
+function lua_module.getIndexSmartObjectByType(type)
+	for k,v in pairs(smartObjectsTable) do
+		if(type == v.type) then
+			return k
+		end
+	end
+	return nil
 end
 
 function lua_module.printTableSmartObject()
-	for i=1,#tableSmartObjects do
+	for i=1,#smartObjectsTable do
 		print("\n-------------------------------------")
-		print("Mac: "..tableSmartObjects[i].mac)
-		print("Type: "..tableSmartObjects[i].type)
-		print("Controllable: "..tableSmartObjects[i].controllable)
-		print("Ambiente físico: "..tableSmartObjects[i].environment)
-		print("DateTime: "..tableSmartObjects[i].clock)
+		print("ID: "..smartObjectsTable[i].ID)
+		print("Type: "..smartObjectsTable[i].type)
+		print("Controllable: "..smartObjectsTable[i].controllable)
+		print("Ambiente físico: "..smartObjectsTable[i].environment)
+		print("DateTime: "..smartObjectsTable[i].clock)
 		print("States: ")
 		print("-------------------------------------")
 
-		for kState,vState in pairs(tableSmartObjects[i].state) do
+		for kState,vState in pairs(smartObjectsTable[i].state) do
 			print("State: "..kState)
-			for kStateValue,vStateValue in pairs(tableSmartObjects[i].state[kState].state_value) do
+			for kStateValue,vStateValue in pairs(smartObjectsTable[i].state[kState].state_value) do
 				print("State Value: "..kStateValue)
 				print("Value: "..vStateValue.value)
 				print("Unit: "..vStateValue.unit)
@@ -110,92 +115,67 @@ function lua_module.printTableSmartObject()
 end
 
 function addSmartObject(obj)
-	tableSmartObjects[#tableSmartObjects + 1] = obj
+	smartObjectsTable[#smartObjectsTable + 1] = obj
 end
 
 function removeSmartObject(index)
-	tableSmartObjects.remove(tableSmartObjects, index)
+	smartObjectsTable.remove(smartObjectsTable, index)
 end
 
 function discoverySmartObject(m)
 	--Example of msg
-	--msg: Environment&Controllable&Type&Id
-	local structMsg = split(m, sepCharMsg)
-	local indexObj = lua_module.searchSmartObject(structMsg[4]) --Mac - ID
+  --msg: json object
+  local obj = json.decode(m)
+	local indexObj = getIndexSmartObjectById(obj.ID) --Mac - ID
 
 	if(indexObj == nil) then
 		--Non-existing object
-		local obj = {
-			['mac'] = structMsg[4],
-			['controllable'] = structMsg[2],
-			['type'] = structMsg[3]
-		}
 		addSmartObject(obj)
-		indexObj = #tableSmartObjects
-		updateDateTime(tableSmartObjects, indexObj)
+		indexObj = #smartObjectsTable
+		updateDateTime(smartObjectsTable, indexObj)
 	end
 end
 
-function disconnectSmartObject(m)
+function disconnectSmartObject(idObj)
 	--Example of msg
 	--msg: Id (Mac)
-	local indexObj = lua_module.searchSmartObject(m) --Mac - ID
+	local indexObj = getIndexSmartObjectById(idObj) --Mac - ID
 	if (indexObj ~= nil) then
-		tableSmartObjects[indexObj] = nil
+		smartObjectsTable[indexObj] = nil
 	end
 end
 
-function updateStateSmartObject(indexObj, structTopic, structMsg)
-	tableSmartObjects[indexObj].environment = structTopic[1]
-	tableSmartObjects[indexObj].state = {}
-	tableSmartObjects[indexObj].state[structTopic[5]] = {}
-	tableSmartObjects[indexObj].state[structTopic[5]].state_value = {}
-	tableSmartObjects[indexObj].state[structTopic[5]].state_value[structTopic[6]] = {
-		['value'] = structMsg[2],
-		['unit'] = structMsg[3]
-	}
-	updateDateTime(tableSmartObjects, indexObj)
+function updateSmartObject(obj)
+  local indexObj = getIndexSmartObjectById(obj.ID)
+  
+  if(indexObj == nil) then return end
+  
+  local so = smartObjectsTable[indexObj]
+  if (so.environment ~= obj.environment) then
+    so.environment = obj.environment
+  end
+  
+  for k, v in pairs(obj.states) do
+    if (so.states[k].unit ~= obj.states[k].unit) then
+      so.states[k].unit = obj.states[k].unit
+    end
+    if (so.states[k].value ~= obj.states[k].value) then
+      so.states[k].value = obj.states[k].value
+    end
+  end
 end
 
-function updateFunctionalityNotificationSmartObject(indexObj, structTopic, structMsg)
-	tableSmartObjects[indexObj].environment = structTopic[1]
-	tableSmartObjects[indexObj].functionality_notification[structTopic[5]].notification[structTopic[6]] = {
-		['notification_name'] = structMsg[1]
-	}
-	updateDateTime(tableSmartObjects, indexObj)
-end
-
-function updateFunctionalityCommandSmartObject(indexObj, structTopic, structMsg)
-	tableSmartObjects[indexObj].environment = structTopic[1]
-	tableSmartObjects[indexObj].functionality_command[structTopic[5]].command[structTopic[6]] = { 
-		['unit'] = structMsg[2]
-	}
-	updateDateTime(tableSmartObjects, indexObj)
-end
-
-function receiveDataSmartObject(t, m)
+function receiveDataSmartObject(m)
 	--Example of topic
-	--Topic: /Environment/Controllable/Type/Id/State/StateValue
-	--Topic: /Environment/Controllable/Type/Id/Functionality/Notification
-	--Topic: /Environment/Controllable/Type/Id/Functionality/Command
-	local topic =  t or ""
-	local msg = m or ""
-
-	local structTopic = split(topic, sepCharTopic)
-	local structMsg = split(msg, sepCharMsg)
-
-	local indexObj = lua_module.searchSmartObject(structTopic[4])
-
+	--Topic: /Environment/Controllable/Type
+  if (m == nil) then return end
+	local obj = json.decode(m)
+	local indexObj = getIndexSmartObjectById(obj.ID)
 	--If non-existing smart object
-	if(indexObj == nil) then return end 
-	
-	if(structMsg[1] == "State") then
-		updateStateSmartObject(indexObj, structTopic, structMsg)
-	elseif (structMsg[1] == "FunctionalityNotification") then
-	    updateFunctionalityNotificationSmartObject(indexObj, structTopic, structMsg)
-	elseif (structMsg[1] == "FunctionalityCommand") then
-	    updateFunctionalityCommandSmartObject(indexObj, structTopic, structMsg)
-	end
+	if(indexObj == nil) then 
+    return
+  end 
+  updateSmartObject(obj)
 end
 -- *** End of methods to Smart Objects ***
 
@@ -330,7 +310,7 @@ local MQTT = require("mqtt_library")
 function getPartialFormattedTopicSmartObject(indexObj)
 	--Topic: /Environment/Controllable/Type/Id/State/StateValue
 	if(indexObj == nil) then return nil end
-	local obj = tableSmartObjects[indexObj]
+	local obj = smartObjectsTable[indexObj]
 	local topic = sepCharTopic
 	topic = topic..obj.environment..sepCharTopic
 	topic = topic..obj.controllable..sepCharTopic
@@ -369,7 +349,7 @@ function lua_module.mqtt_lua_module.postStateValue(indexObj, state, stateValue)
 	if(state == nil) then return end
 	if(stateValue == nil) then return end
 
-	local obj = tableSmartObjects[indexObj]
+	local obj = smartObjectsTable[indexObj]
 
 	local topic = getPartialFormattedTopicSmartObject(indexObj)
 	topic = topic..state..sepCharTopic
@@ -384,7 +364,7 @@ function lua_module.mqtt_lua_module.postAllStateValues(indexObj, state)
 	if(indexObj == nil) then return end
 	if(state == nil) then return end
 
-	local obj = tableSmartObjects[indexObj]
+	local obj = smartObjectsTable[indexObj]
 	for k,v in pairs(obj.state[state].state_value) do
 		lua_module.mqtt_lua_module.postStateValue(indexObj, state, k)		
 	end
@@ -395,7 +375,7 @@ function lua_module.mqtt_lua_module.postState(indexObj, state)
 end
 
 function lua_module.mqtt_lua_module.postAllStates()
-	for k,v in pairs(tableSmartObjects) do
+	for k,v in pairs(smartObjectsTable) do
 		for kS,vS in pairs(v.state) do
 			lua_module.mqtt_lua_module.postState(k, kS)
 		end
@@ -423,46 +403,75 @@ function lua_module.mqtt_lua_module.postObject(obj)
 end
 
 
+
+-- *******************************************
+-- ****** Methods to topics ******
+-- *******************************************
+function lua_module.getTopicsList()
+  return topicsTable
+end
+
+function lua_module.addTopic(topic)
+  topicsTable[#topicsTable + 1] = topic
+end
+
+function lua_module.removeTopic(topic)
+  for k, v in pairs(topicsTable) do
+    if (v == topic) then
+      topicsTable[k] = nil
+    end
+  end
+end
+
+
 -- *****************************************
 -- ***************** Main ******************
 -- *****************************************
 function lua_module.main(t, m)
 	local topic = t or ""
 	local msg = m or ""
+  
+  --Reserved Topics
 	local switch = {
-		['/reserved_topic/smart_object_discovered'] = function()
+		['/discovery'] = function()
 			discoverySmartObject(msg)
 		end,
-		['/reserved_topic/smart_object_disconnected'] = function()
+		['/disconnected'] = function()
 			disconnectSmartObject(msg)
 		end,
-		['/reserved_topic/result_query'] = function()
+		['/resultquery'] = function()
+			print "Test: resultaquery = ok"
+		end,
+		['/user_interaction/is_alive'] = function()
 			print "Test: ok"
 		end,
-		['/reserved_topic/user_interaction/is_alive'] = function()
+		['/user_interaction/interaction'] = function()
 			print "Test: ok"
 		end,
-		['/reserved_topic/user_interaction/interaction'] = function()
-			print "Test: ok"
-		end,
-		['/reserved_topic/test'] = function()
+		['/test'] = function()
 			print "Test: ok"
 		end
 	}
-
+  
+  for k, v in pairs(topicsTable) do
+    switch['/discovery'..v] = function() discoverySmartObject(msg) end
+    switch['/read'..v] = function() receiveDataSmartObject(msg) end
+  end
+  
 	local f = switch[topic]
 
 	if(f) then
 		f()
 	else				-- for case default
-		receiveDataSmartObject(topic, msg)
+		receiveDataSmartObject(msg)
 	end
 
 end
 
---[[f
+
+--[[
 --Metodo para teste manual
-unction lua_module.mainManual()
+function lua_module.mainManual()
 	local op
 	repeat
 		print("*****************************************************************")
