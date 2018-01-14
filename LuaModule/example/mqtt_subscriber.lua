@@ -1,18 +1,14 @@
-local lua_module = require ("lua_module")
+-- Imports
+package.path = package.path .. ";../libs/?.lua"
 
 function callback(
   topic,    -- string
   message)  -- string
    	print("Topic: " .. topic .. ", message: '" .. message .. "'")
-   	lua_module.discoverySmartObject(topic, message)
-   	print("Size table: "..(#lua_module.getTableSmartObject()))
-	if(message == "print") then
-	   lua_module.printTableSmartObject()
-	end
 end
 
 local args =  {
-	  ['host'] = '192.168.10.39',
+	  ['host'] = 'localhost',
 	  ['id'] = 'mqtt_tv',
 	  ['message'] = '',
 	  ['port'] = 1883,
@@ -20,9 +16,11 @@ local args =  {
 	  ['will_message'] = '.',
 	  ['will_qos'] = 0,
 	  ['will_retain'] = 0,
-	  ['will_topic'] = '.'
+	  ['will_topic'] = '.',
+    ['keepalive'] = 3000,
+    ['debug'] = true
 	}
-
+ 
 local MQTT = require("mqtt_library")
 
 if (args.debug) then MQTT.Utility.set_debug(true) end
@@ -37,7 +35,7 @@ else
   	mqtt_client:connect(args.id, args.will_topic, args.will_qos, args.will_retain, args.will_message)
 end
 
-mqtt_client:subscribe({args.topic})
+mqtt_client:subscribe({'/a','/b','/c'})
 
 local error_message = nil
 

@@ -1,3 +1,4 @@
+package.path = package.path .. ";../libs/?.lua"
 -- mqtt_library.lua
 -- ~~~~~~~~~~~~~~~~
 -- Please do not remove the following notices.
