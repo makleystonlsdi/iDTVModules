@@ -30,7 +30,7 @@ if (isPsp()) then socket = Socket end                        -- Compatibility !
 
 -- ------------------------------------------------------------------------- --
 
-local debug_flag = true
+local debug_flag = false
 
 local function set_debug(value) debug_flag = value end
 
