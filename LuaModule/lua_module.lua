@@ -4,17 +4,33 @@ lanes = require "lanes".configure()
 
 -- Tables
 local smartObjectsTable = {}
+local smartObjectsRequiredTable = {}
 local portableDevicesTable = {}
-local interactionsTable = {}
-local topicsTable = {}
-local topicsTableEdit = {}
-local environmentsTable = {'+'}
-local enableInteractionsOfUser = false
+local interactionsSupportedTable = {}
 
 -- Global Variables 
 local mqtt_client
-local time_active_portable_devices = 20 --seconds
+local time_active_portable_devices = 1.0 --seconds / 10
+local count_time_active_portable_devices = 0.0
 local debug = false
+
+--Default topics
+local TOPIC = {}
+TOPIC.SMART_OBJECT_DISCOVERY    = "smart_object_discovery" -- discovery of services in smart object
+TOPIC.SMART_OBJECT_READ         = "smart_object_read" -- smart object read
+TOPIC.SMART_OBJECT_POST         = "smart_object" -- post smart object
+TOPIC.SMART_OBJECT_DISCONNECT   = "smart_object_disconnected" -- smart object disconnected
+TOPIC.QUERY_RESULT              = "query_result" -- query result
+TOPIC.PORTABLE_DEVICE_RECEIVER  = "portable_device_receiver" -- receive data from portable devices
+TOPIC.TEST                      = "test" -- test
+TOPIC.PORTABLE_DEVICE_ALIVE     = "alive_portable_device" -- portable device alive
+
+-- TAGs
+local TAG = {}
+TAG.ERROR = 'ERROR'
+TAG.SUCESS = 'SUCESS'
+TAG.CANCEL = 'CANCEL'
+TAG.NOTFOUND = 'NOT FOUND'
 
 -- MQTT Settings
 local mqtt_settings ={
@@ -49,38 +65,20 @@ function setDebug(bool)
     end
 end
 
-function printStyle(str)
-    local size = string.len(str)
-    local ch = ""
-    for i=1, size*2 do
-        ch = ch.."*"
-    end
-    local mid = size/2
-    local chc = ""
-    if(math.fmod(size, 2)==0)then
-        mid = mid-1
-    end
-    for i=1, mid do
-        chc = chc.." "
-    end
-    local s = "*"..chc..str..chc.."*"
-    print(ch)
-    print(s)
-    print(ch)
+function printDebug(tag, str)
+    print(tag, str)
 end
 
-function printDebug(str, str2)
-    print(str, str2)
-end
-
-function updateDateTime(table, indexObj)
+function updateDateTime(tab, indexObj)
     local clock = os.clock()
-    table[indexObj].clock = clock
+    tab[indexObj].clock = clock
+	tab[indexObj].time = count_time_active_portable_devices
 end
 
 --If is alive then it returns true, if it does not return false
-function calcDiffClock(clockInit, clockEnd)
-    if(clockEnd - clockInit) <= mqtt_settings.time_active_portable_devices then
+function calcDiffClock(timesalved)
+	--print(os.difftime (clockEnd+count_time_active_portable_devices, clockInit))
+    if(count_time_active_portable_devices-timesalved <= time_active_portable_devices) then
         return true
     else
         return false
@@ -138,40 +136,72 @@ function getIndexSmartObjectByType(type)
     return nil
 end
 
+--Returned smart object in table
+function getSmartObjectById(id)
+    for k,v in pairs(smartObjectsTable) do
+        --print(id..' - '..v.id)
+        if(id == v.id) then
+            return v
+        end
+    end
+    return nil
+end
+
+--Returned smart objects in table
+function getSmartObjectByType(type)
+    for k,v in pairs(smartObjectsTable) do
+        if(type == v.type) then
+            return v
+        end
+    end
+    return nil
+end
+
 function addSmartObject(obj)
     table.insert(smartObjectsTable, obj)
 end
 
-function removeSmartObject(index)
+function removeSmartObjectByIndex(index)
     table.remove(smartObjectsTable, index)
 end
 
-function discoverySmartObject(m)
-    --Example of msg
-    --msg: json object
-    local obj = json.decode(m)
+function checkReceives()
+	for kRequired, objRequired in pairs(smartObjectsRequiredTable) do
+		for k, obj in pairs(smartObjectsTable) do
+			if(objRequired.type == obj.type)then
+				if(objRequired.environment)and(objRequired.environment == obj.environment)then
+					smartObjectsTable[k].receiveNotifications = objRequired.receiveNotifications
+					smartObjectsTable[k].receiveStates = objRequired.receiveStates
+					break
+				end
+			end
+		end
+	end
+end
+
+function discoverySmartObject(obj)
     local indexObj = getIndexSmartObjectById(obj.id) --Mac - id
 
     if(indexObj == nil) then
         --Non-existing object
         addSmartObject(obj)
-        indexObj = #smartObjectsTable
+        indexObj = getIndexSmartObjectById(obj.id)
         updateDateTime(smartObjectsTable, indexObj)
         if(debug)then
            printDebug("discovery smart object:", obj.id)
         end
+	    checkReceives()
     end
 end
 
-function disconnectSmartObject(idObj)
-    --Example of msg
-    --msg: id (Mac)
-    local indexObj = getIndexSmartObjectById(idObj) --Mac - id
+function disconnectSmartObject(id)
+    local indexObj = getIndexSmartObjectById(id) -- {id}
     if (indexObj ~= nil) then
-        table.remove(smartObjectsTable, indexObj)
+	    removeSmartObjectByIndex(indexObj)
         if(debug)then
-            printDebug("disconnect smart object:", idObj)
+            printDebug("disconnect smart object:", id)
         end
+	    checkReceives()
     end
 end
 
@@ -206,85 +236,70 @@ function updateSmartObject(obj)
             so.states[k].value = obj.states[k].value
         end
     end
+    so.functionality = obj.functionality
+	smartObjectsTable[indexObj] = so
 end
 
-function receivedDataSmartObject(m)
-    --Example of topic
-    --Topic: /Environment/Controllable/Type
-    if (m == nil) then return end
-    local obj = json.decode(m)
-    --print(obj.id, obj.states.color_state.value)
+function receivedDataSmartObject(obj)
     local indexObj = getIndexSmartObjectById(obj.id)
     --If non-existing smart object
     if(indexObj == nil) then
-        discoverySmartObject(m)
+        discoverySmartObject(obj)
     else
         updateSmartObject(obj)
     end
+end
+
+function setSmartObjectsListener(t)
+	if(t)then
+		smartObjectsRequiredTable = t
+	end
 end
 -- *** End of methods to Smart Objects ***
 
 -- *************************************
 -- ****** Methods to Interactions ******
 -- *************************************
-function getIndexInteractionByInteractionName(interactionName)
-    if(interactionName == nil) then return end
-    for k, v in pairs(interactionsTable) do
-        if(v[interactionName]) then
+function getIndexSupportedInteraction(interaction)
+    if(interaction == nil) then return end
+    for k, inter in pairs(interactionsSupportedTable) do
+        if(inter.name == interaction.name) then
             return k
         end
     end
 end
 
---Example of Interaction Table
---Table = {{['interactionName'] = {['description'] = '', ['action'] = function f() end}}, ...}
-function setInteractionsTable(table)
-    interactionsTable = table
-end
-
-function getInteractionsTable()
-    return tableInteractions
-end
-
---Ex.: interaction = {['interactionName'] = function f() end}
-function addInteraction(interaction)
-    table.insert(interactionsTable, interaction)
-end
-
-function removeInteractionByInteractionName(interactionName)
-    local indexInteraction = getIndexInteractionByInteractionName(interactionName)
-    if(indexInteraction)then
-        table.remove(interactionsTable, indexInteraction)
-    end
-end
-
 -- Methods to generate events from interaction realized
--- Ex.: interactionsOfUser = {'left', 'next', 'play'}
-function detectInteraction(interactionsOfUser)
-    local detectedInteractons = {}
-    for i = 1, #interactionsOfUser do
-        local indexInteraction = getIndexInteractionByInteractionName(interactionsOfUser[i])
-        if(indexInteraction)then
-            table.insert(detectedInteractons, interactionsOfUser[i])
-            local f = interactionsTable[indexInteraction][interactionsOfUser[i]].action
-            f()
+function detectInteraction(device)
+	local flag = false
+    for i = 1, #device.interactions do
+        local indexSupportedInteraction = getIndexSupportedInteraction(device.interactions[i])
+        if(indexSupportedInteraction)then
+            interactionsSupportedTable[indexSupportedInteraction]:detectedInteraction(device)
             if(debug)then
-                printDebug("interaction detected:", interactionsOfUser[i])
+                printDebug("interaction detected:", device.interactions[i].name)
             end
+            flag = true
         end
     end
-    if(detectedInteractons)then
-        return detectedInteractons
-    end
-    if(debug)then
-        printDebug("no interaction detected:", interactionsOfUser[i])
+    if(flag == nil)then
+	    if(debug)then
+	        printDebug(TAG.NOTFOUND, "No interaction detected:")
+	    end
     end
 end
 
 function enableInteractions(bool)
-    enableInteractionsOfUser = bool
+	if(bool) then
+        enableInteractionsOfUser = bool
+	end
 end
 
+function setInteractionsListener(t)
+	if(t)then
+		interactionsSupportedTable = t
+	end
+end
 -- ****** Methods to Interactions ******
 
 -- *****************************************
@@ -322,12 +337,6 @@ function removePortableDeviceById(id)
 end
 
 function getPortableDevicesTable()
-    for k,v in pairs(portableDevicesTable) do
-        --If is alive
-        if (calcDiffClock(v.clock, os.clock()) == false) then
-            removePortableDeviceByIndex(k)
-        end
-    end
     return portableDevicesTable
 end
 
@@ -342,102 +351,91 @@ function updatePortableDevice(device)
     local indexDev = getIndexPortableDeviceById(device.id)
     if(indexDev == nil)then return end
     portableDevicesTable[indexDev].environment = device.environment
-    --person = {['attr'] = 'value'}
     portableDevicesTable[indexDev].person = device.person
-    portableDevicesTable[indexDev].uuid_person = device.uuid_person
     portableDevicesTable[indexDev].interactions = device.interactions
-    --print(portableDevicesTable[indexDev].person.name)
     if(debug)then
         printDebug("update portable device:", device.id)
     end
-    detectInteraction(device.interactions)
 end
 
-function receivedDataPortableDevice(mPortable)
-    if(mPortable == nil)then return end
-    local device = json.decode(mPortable)
+function receivedDataPortableDevice(device)
+    if(device == nil)then return end
+
     local indexDev = getIndexPortableDeviceById(device.id)
     if(indexDev)then
         updatePortableDevice(device)
     else
         addProtableDevice(device)
     end
-    updateDateTime(portableDevicesTable, indexDev or #portableDevicesTable)
+    updateDateTime(portableDevicesTable, indexDev or getIndexPortableDeviceById(device.id))
+	detectInteraction(device)
 end
 
+function setAliveTimePortableDevice(time)
+	if(time)then
+		time_active_portable_devices = time / 10
+	end
+end
+
+function checkPortableDevicesAlive()
+	for k,v in pairs(portableDevicesTable) do
+		--If is alive
+		if (calcDiffClock(v.time) == false) then
+			if(debug)then
+				printDebug('portable device not alive: ',v.id)
+			end
+			removePortableDeviceByIndex(k)
+		end
+	end
+end
 -- *** End of methods to Portable Devices ***
 
--- *******************************************
--- ****** Methods to topics ******
--- *******************************************
-function setTopicsTable(table)
-    local topics = {}
-    for k, v in pairs(table) do
-        table.insert(topics, formatTopic(v))
-    end
-    topicsTable = topics
-end
-
-function getTopicsTable()
-    return topicsTable
-end
-
-function addTopic(topic)
-    table.insert(topicsTable, formatTopic(topic))
-end
-
-function removeTopic(topic)
-    for k, v in pairs(topicsTable) do
-        if (v == topic) then
-            table.remove(topicsTable, k)
-        end
-    end
-end
-
-function setEnvironmentTable(environmentTable)
-    local environments = {}
-    for k, v in pairs(environmentTable) do
-        table.insert(environments, formatTopic(v))
-    end
-    environmentsTable = environments
-end
-
-function getEnvironment()
-    return environmentsTable
-end
-
 -- *****************************************
--- ***************** Topics Filter ******************
+-- ***************** Topics Filter *********
 -- *****************************************
+function smartObjectListiner(msg)
+	local indexObj = getIndexSmartObjectById(msg.id)
+	local obj = smartObjectsTable[indexObj]
+	obj:receiveNotifications(obj.functionality.notificationfunctionality)
+	obj:receiveStates(obj.sates)
+	for k, notification in pairs(obj.functionality.notificationfunctionality) do
+		notification.notificationname = nil
+		notification.value = nil
+	end
+end
 
 function topicsFilter(t, m)
-
     local t2 = t or ""
-    local msg = m or ""
+    if(m == nil) then return end
 
-    local topic = split(t2, '/')
+    local msg = json.decode(m)
+
+    local topic = split(string.lower(t2), '/')
 
     --Topics
     local switch = {
-        ['smart_object_discovery'] = function()
+        [TOPIC.SMART_OBJECT_DISCOVERY] = function()
             discoverySmartObject(msg)
         end,
-        ['smart_object_read'] = function()
+        [TOPIC.SMART_OBJECT_READ] = function()
             receivedDataSmartObject(msg)
+	        smartObjectListiner(msg)
         end,
-        ['smart_object_disconnected'] = function()
+        [TOPIC.SMART_OBJECT_DISCONNECT] = function()
             disconnectSmartObject(msg)
         end,
-        ['query_result'] = function()
+        [TOPIC.QUERY_RESULT] = function()
             print "Test: resultaquery = ok"
         end,
-        ['alive_portable_device'] = function()
-            print ("is alive: id = "..m)
+        [TOPIC.PORTABLE_DEVICE_ALIVE] = function()
+            if(msg)then
+	            updateDateTime(portableDevicesTable, msg)
+            end
         end,
-        ['portable_device'] = function()
+        [TOPIC.PORTABLE_DEVICE_RECEIVER] = function()
             receivedDataPortableDevice(msg)
         end,
-        ['test'] = function()
+        [TOPIC.TEST] = function()
             print ("Test: ok, msg = "..msg)
         end
     }
@@ -446,74 +444,77 @@ function topicsFilter(t, m)
 
     if(f) then
         f()
-    else				-- for case default
-        --print(msg)
-        receivedDataSmartObject(msg)
     end
-
 end
+-- **************** end **********
+
+-- ********** Topics ************
+function getTopics()
+	local topicsTable = {}
+	for k, obj in pairs(smartObjectsRequiredTable) do
+		local topicsThisObj = {}
+		local env = '+'
+		if(obj.environment ~= nil)then
+			env = obj.environment
+		end
+		table.insert(topicsThisObj, '/'..TOPIC.SMART_OBJECT_DISCONNECT..formatTopic(env))
+		table.insert(topicsThisObj, '/'..TOPIC.SMART_OBJECT_DISCOVERY..formatTopic(env))
+		table.insert(topicsThisObj, '/'..TOPIC.SMART_OBJECT_READ..formatTopic(env))
+
+		for k, v in pairs(topicsThisObj) do
+			if(obj.controllable == nil) then
+				topicsThisObj[k] = topicsThisObj[k]..formatTopic('+')
+			else
+				topicsThisObj[k] = topicsThisObj[k]..formatTopic(obj.controllable)
+			end
+			if(obj.type == nil)then
+				if(debug)then
+					printDebug(TAG.ERROR, '[obj].type is nil')
+				end
+			else
+				topicsThisObj[k] = topicsThisObj[k]..formatTopic(obj.type)
+			end
+		end
+		for i = 1, #topicsThisObj do
+			table.insert(topicsTable, topicsThisObj[i])
+		end
+	end
+
+	if(#interactionsSupportedTable > 0)then
+		table.insert(topicsTable, '/'..TOPIC.PORTABLE_DEVICE_ALIVE..formatTopic('+'))
+		table.insert(topicsTable, '/'..TOPIC.PORTABLE_DEVICE_RECEIVER..formatTopic('+'))
+	end
+
+	return topicsTable
+end
+-- ********** End ***************
 
 -- *****************************************
 -- ******** Methods to Post Message ********
 -- *****************************************
-mqtt_lua_module = {}
+local mqtt_lua_module = {}
 
-function mqtt_lua_module:postMessage(t, msg)
-    if(msg == nil)then return end
-    if(t == nil)then return end
+function mqtt_lua_module:post(topic, msg)
+	if(msg == nil)then return end
+	local objJ = json.encode(msg)
 
-    local topic = t or "/test"
+	if (mqtt_settings.debug) then MQTT.Utility.set_debug(true) end
 
-    if (mqtt_settings.debug) then MQTT.Utility.set_debug(true) end
+	local mqtt_client = MQTT.client.create(mqtt_settings.host_mhubtv, mqtt_settings.port)
 
-    local mqtt_client = MQTT.client.create(mqtt_settings.host_mhubtv, mqtt_settings.port)
-
-    if (mqtt_settings.will_message == "."  or  mqtt_settings.will_topic == ".") then
-        mqtt_client:connect(mqtt_settings.id)
-    else
-        mqtt_client:connect(
-            mqtt_settings.id, mqtt_settings.will_topic, mqtt_settings.will_qos, mqtt_settings.will_retain, mqtt_settings.will_message
-        )
-    end
-
-    mqtt_client:publish(topic, msg)
-
-    mqtt_client:destroy()
-end
-
-function mqtt_lua_module:postSmartObject(obj)
-    if(obj == nil)then return end
-    local objJ = json.encode(obj)
-    local topic = "/smart_object"
-
-    if (mqtt_settings.debug) then MQTT.Utility.set_debug(true) end
-
-    local mqtt_client = MQTT.client.create(mqtt_settings.host_mhubtv, mqtt_settings.port)
-
-    if (mqtt_settings.will_message == "."  or  mqtt_settings.will_topic == ".") then
-        mqtt_client:connect(mqtt_settings.id)
-    else
-        mqtt_client:connect(
-            mqtt_settings.id, mqtt_settings.will_topic, mqtt_settings.will_qos, mqtt_settings.will_retain, mqtt_settings.will_message
-        )
-    end
-
-    mqtt_client:publish(topic, objJ)
-    mqtt_client:destroy()
-end
-
-local subscribeThread = function(mqtt_client)
-    print("aaaaaa")
-	local error_message = nil
-	while (error_message == nil) do
-		error_message = mqtt_client:handler()
-		socket.sleep(1.0)
-        print(#smartObjectsTable)
+	if (mqtt_settings.will_message == "."  or  mqtt_settings.will_topic == ".") then
+		mqtt_client:connect(mqtt_settings.id)
+	else
+		mqtt_client:connect(
+			mqtt_settings.id, mqtt_settings.will_topic, mqtt_settings.will_qos, mqtt_settings.will_retain, mqtt_settings.will_message
+		)
 	end
-	return error_message
+
+	mqtt_client:publish(topic, objJ)
+	mqtt_client:destroy()
 end
 
-function subscribeAllTopics()
+function mqtt_lua_module:subscribe()
     if (mqtt_settings.debug) then MQTT.Utility.set_debug(true) end
 
     if (mqtt_settings.keepalive) then MQTT.client.KEEP_ALIVE_TIME = mqtt_settings.keepalive end
@@ -526,85 +527,125 @@ function subscribeAllTopics()
         mqtt_client:connect(mqtt_settings.id, mqtt_settings.will_topic, mqtt_settings.will_qos, mqtt_settings.will_retain, mqtt_settings.will_message)
     end
 
-    topicsTableEdit = {}
-    for k,v in pairs(environmentsTable)do
-        for kt, vt in pairs(topicsTable)do
-            local t = formatTopic(v)
-            t = t .. formatTopic(vt)
-            table.insert(topicsTableEdit, formatTopic("smart_object_discovery")..t)
-            table.insert(topicsTableEdit, formatTopic("smart_object_read")..t)
-        end
-    end
-    table.insert(topicsTableEdit, formatTopic("smart_object_disconnected"))
+	local topics = getTopics()
 
     if(debug)then
-        for k,v in pairs(topicsTableEdit) do
-            printDebug("subscribed topic: ", v)
-        end
+	    if(#topics == 0)then
+		    printDebug("subscribed topic: ", 'nil')
+	    else
+	        for k,v in pairs(topics) do
+	            printDebug("subscribed topic: ", v)
+	        end
+	    end
     end
 
-    mqtt_client:subscribe(topicsTableEdit)
+    mqtt_client:subscribe(topics)
 
-    local error_message = nil
+    local error_message
     while (error_message == nil) do
         error_message = mqtt_client:handler()
-        socket.sleep(1.0)
+        local sleepTimer = 1.0
+        socket.sleep(sleepTimer)
         if(debug)then
             printDebug("total smart object:", #smartObjectsTable)
+	        if(#interactionsSupportedTable > 0)then
+		        printDebug("total portable devices:", #portableDevicesTable)
+		        print("")
+	        end
         end
+        count_time_active_portable_devices = count_time_active_portable_devices+sleepTimer/10
+	    -- To check portable devices alive
+		checkPortableDevicesAlive()
     end
 
-  --  subscribeThread(mqtt_client)
---	a = lanes.gen( "", subscribeThread)()
-
     if (error_message == nil) then
-        mqtt_client:unsubscribe(topicsTable)
+        mqtt_client:unsubscribe(topics)
         mqtt_client:destroy()
     else
         print(error_message)
     end
 end
 
-function unsubscribeAllTopics()
+function mqtt_lua_module:unsubscribe()
     if(mqtt_client) then
         mqtt_client:unsubscribe(topicsTableEdit)
     end
 end
 
-function refreshSubscribes()
-    lua_module.unsubscribeAllTopics()
-    lua_module.subscribeAllTopics()
+function mqtt_lua_module:refreshSubscribes()
+    lua_module.mqtt_lua_module:unsubscribe()
+    lua_module.mqtt_lua_module:subscribe()
+end
+
+function start()
+	mqtt_lua_module:subscribe()
+end
+
+function stop()
+	mqtt_lua_module:unsubscribeAllTopics()
+end
+
+function restart()
+	mqtt_lua_module:refreshSubscribes()
+end
+
+function postMessage(t, msg)
+	if(msg == nil)then return end
+	local topic = t or "/test"
+
+	mqtt_lua_module:post(topic, msg)
+end
+
+function postSmartObject(obj)
+	if(obj == nil)then return end
+	local objJ = json.encode(obj)
+	local topic = TOPIC.SMART_OBJECT_POST
+
+	if (mqtt_settings.debug) then MQTT.Utility.set_debug(true) end
+
+	local mqtt_client = MQTT.client.create(mqtt_settings.host_mhubtv, mqtt_settings.port)
+
+	if (mqtt_settings.will_message == "."  or  mqtt_settings.will_topic == ".") then
+		mqtt_client:connect(mqtt_settings.id)
+	else
+		mqtt_client:connect(
+			mqtt_settings.id, mqtt_settings.will_topic, mqtt_settings.will_qos, mqtt_settings.will_retain, mqtt_settings.will_message
+		)
+	end
+
+	mqtt_client:publish(topic, objJ)
+	mqtt_client:destroy()
 end
 
 local lua_module = {}
+-- Settings MQTT
 lua_module.setMqttSettings = setMqttSettings
 lua_module.getMqttSettings = getMqttSettings
-lua_module.setDebug = setDebug
+
+-- Methods related to Smart Objects
 lua_module.getSmartObjectsTable = getSmartObjectsTable
-lua_module.getIndexSmartObjectById = getIndexSmartObjectById
-lua_module.getIndexSmartObjectByType = getIndexSmartObjectByType
-lua_module.setInteractionsTable = setInteractionsTable
-lua_module.getInteracionsTable = getInteracionsTable
-lua_module.addInteraction = addInteraction
-lua_module.getIndexInteractionByInteractionName = getIndexInteractionByInteractionName
-lua_module.removeInteractionByInteractionName = removeInteractionByInteractionName
-lua_module.detectInteraction = detectInteraction
+lua_module.getSmartObjectById = getSmartObjectById
+lua_module.getSmartObjectByType = getSmartObjectByType
+
+-- Methods related to interactions of the users and portable devices
 lua_module.enableInteractions = enableInteractions
 lua_module.getIndexPortableDeviceById = getIndexPortableDeviceById
 lua_module.getPortableDevicesTable = getPortableDevicesTable
-lua_module.setEnvironmentTable = setEnvironmentTable
-lua_module.getEnvironmentTable = getEnvironmentTable
-lua_module.setTopicsTable = setTopicsTable
-lua_module.getTopicsTable = getTopicsTable
-lua_module.addTopic = addTopic
-lua_module.removeTopic = removeTopic
-lua_module.subscribeAllTopics = subscribeAllTopics
-lua_module.unsubscribeAllTopics = unsubscribeAllTopics
-lua_module.refreshSubscribes = refreshSubscribes
-lua_module.mqtt_lua_module = mqtt_lua_module
 
+-- Mode debug to LuaModule
+lua_module.setDebug = setDebug
 
---test | remover depois
-lua_module.topicsFilter = topicsFilter
+-- Methods LuaModule
+lua_module.start = start
+lua_module.stop = stop
+lua_module.restart = restart
+lua_module.postSmartObject = postSmartObject
+
+-- Set listeners
+lua_module.setSmartObjectsListener = setSmartObjectsListener
+lua_module.setInteractionsListener = setInteractionsListener
+
+-- Remover depois é apenas para testes
+--lua_module.postMessage = postMessage
 
 return lua_module

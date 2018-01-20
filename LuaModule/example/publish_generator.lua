@@ -1,9 +1,8 @@
 package.path = package.path .. ";../?.lua"
 package.path = package.path .. ";../libs/?.lua"
 
-local json = require 'json_lua'
 local lua_module = require 'lua_module'
-local log = true
+local log = false
 
 local mqtt_settings = {}
 mqtt_settings.host_mhubtv = 'localhost'
@@ -90,15 +89,17 @@ function publishDicoverySmartObject()
     obj.states.intensity_state.unit = "continuou_value"
     obj.states.intensity_state.value = "0.75"
 
-    obj.functionalities = {}
-    obj.functionalities.change_color = {"set_RGB"}
-    obj.functionalities.regulator_light = {"step_up","step_down","set"}
+    obj.functionality = {}
+    obj.functionality.notificationfunctionality = {}
+    obj.functionality.notificationfunctionality.notificationname = ''
+
+    obj.functionality.controllfunctionality = {}
+    obj.functionality.controllfunctionality.change_color = {"set_RGB"}
+    obj.functionality.controllfunctionality.regulator_light = {"step_up","step_down","set"}
 
     table.insert(smartObjectsPresent, obj)
 
-    local objJ = json.encode(obj)
-
-    lua_module.mqtt_lua_module:postMessage('/smart_object_discovery/'..obj.environment..'/'..obj.controllable..'/'..obj.type, objJ)
+    lua_module.postMessage('/smart_object_discovery/'..obj.environment..'/'..obj.controllable..'/'..obj.type, obj)
     if(log)then
         print("discovery so: id = "..obj.id..", type = "..obj.type)
     end
@@ -111,7 +112,7 @@ function publishDisconnectSmartObject()
         local index = math.random(getSizeSmartObjectTable())
         if(smartObjectsPresent[index])then
             local obj = smartObjectsPresent[index]
-            lua_module.mqtt_lua_module:postMessage('/smart_object_disconnected', obj.id)
+            lua_module.postMessage('/smart_object_disconnected', obj.id)
             if(log)then
                 print("disconnect so: id = "..obj.id)
             end
@@ -132,7 +133,7 @@ function publishReadSmartObject()
             smartObjectsPresent[index].environment = environments[math.random(#environments)]
             smartObjectsPresent[index].states.color_state.value = colors[math.random(#colors)]
 
-            lua_module.mqtt_lua_module:postMessage('/smart_object_read/'..smartObjectsPresent[index].environment..'/'..smartObjectsPresent[index].controllable..'/'..smartObjectsPresent[index].type, json.encode(smartObjectsPresent[index]))
+            lua_module.postMessage('/smart_object_read/'..smartObjectsPresent[index].environment..'/'..smartObjectsPresent[index].controllable..'/'..smartObjectsPresent[index].type, smartObjectsPresent[index])
             if(log)then
                 print("read so: id = "..smartObjectsPresent[index].id..", Env = "..smartObjectsPresent[index].environment..", color = "..smartObjectsPresent[index].states.color_state.value)
             end
@@ -165,8 +166,8 @@ function publishReadPortableDevice()
     for k, v in pairs(devicesPresents)do
         v.interactions = {interactions[math.random(#interactions)]}
 
-        local vJ = json.encode(v)
-        lua_module.mqtt_lua_module:postMessage('/portable_device/'..v.environment..'/'..v.type, vJ)
+        local vJ = v
+        lua_module.postMessage('/portable_device/'..v.environment..'/'..v.type, vJ)
         if(log)then
             print("read pd: id = "..v.id..", person = "..v.person.name..", interaction = "..v.interactions[1])
         end
@@ -178,7 +179,7 @@ function publishIsAlivePortableDevice()
         table.insert(devicesPresents, devices[math.random(#devices)])
     end
     for k, v in pairs(devicesPresents)do
-        lua_module.mqtt_lua_module:postMessage('/alive_portable_device', v.id)
+        lua_module.postMessage('/alive_portable_device', v.id)
         if(log)then
             print("is alive g: id = "..v.id)
         end
