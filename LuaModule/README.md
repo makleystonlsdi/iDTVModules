@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # iDTVModules
 
 A Internet das Coisas (IoT) está presente em diversos domínios, como indústrias, cidades inteligentes e casas inteligentes. Este último pode fazer uso da TV para gerenciar as coisas da IoT. Não somente, a TV pode fazer uso da IoT para oferecer um maior grau de imersão aos telespectadores ao conteúdo apresentado. Exemplificando, pode-se televisionar um vídeo onde ao decorrer de sua narrativa o ambiente físico de apresentação fosse se adequando ao apresentado: regulando a intensidade de iluminação, a temperatura do ambiente, o acionamento de aromatizantes, dentre outros.
@@ -19,3 +20,6 @@ Nesta página você encontrará módulos de diversos *middlewares* de TVs digita
 [Laboratório de Sistemas Distribuídos Inteligentes (LSDi)](www.lsdi.ufma.br)
 
 [Universidade Federal do Maranhão (UFMA)](www.ufma.br)
+=======
+
+>>>>>>> origin/master
