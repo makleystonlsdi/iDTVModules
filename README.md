@@ -1,5 +1,4 @@
-![GitHub Logo](/images/logo.png)
-Format: ![Alt Text](url)
+![IoTTV](http://lsdi.ufma.br/~dannepereira/images/iottv.png)
 
 # iDTVModules
 
