@@ -1,8 +1,8 @@
 # iDTVModules
 
-A Internet das Coisas (IoT) está presente em diversos domínios, como indústrias, cidades inteligentes e casas inteligentes. Este último pode fazer uso da TV para gerenciar as coisas da IoT. Não somente, a TV pode fazer uso da IoT para oferecer um maior grau de imersão aos telespectadores ao conteúdo apresentado. Exemplificando, pode-se televisionar um vídeo onde ao decorrer de sua narrativa o ambiente físico de apresentação fosse se adequando ao apresentado: regulando a intensidade de iluminação, a temperatura do ambiente, o acionamento de aromatizantes, dentre outros.
+A Internet das Coisas (IoT) está presente em diversos domínios, como indústrias, cidades inteligentes e casas inteligentes. Este último pode fazer uso da TV para gerenciar as coisas da IoT. Não somente, a TV, fazendo uso da IoT, pode promover um maior grau de imersão aos telespectadores ao conteúdo apresentado. Exemplificando, pode-se televisionar um vídeo onde ao decorrer de sua narrativa os aspectos do ambiente físico de apresentação fossem se adequando ao conteúdo apresentado: regulando a intensidade de iluminação, a temperatura do ambiente, o acionamento de aromatizantes, dentre outros.
 
-Neste contexto, o projeto [IoTTV](www.lsdi.ufma.br/~iottv) busca convergir ambas áreas em busca de:
+Neste contexto, o projeto [IoTTV](www.lsdi.ufma.br/~iottv) busca convergir ambas áreas com objetivo de:
 * Permitir que a aplicação em execução na TV possa alterar aspectos do ambiente físico 
 * Permitir que o conteúdo apresentado na TV possa estar ciênte de dados de contexto do ambiente físico de apresentação
 * Permitir que o telespectador possa interagir por diversos modos com a aplicação em execução na TV
