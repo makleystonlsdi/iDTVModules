@@ -1,3 +1,6 @@
+![GitHub Logo](/images/logo.png)
+Format: ![Alt Text](url)
+
 # iDTVModules
 
 A Internet das Coisas (IoT) está presente em diversos domínios, como indústrias, cidades inteligentes e casas inteligentes. Este último pode fazer uso da TV para gerenciar as coisas da IoT. Não somente, a TV, fazendo uso da IoT, pode promover um maior grau de imersão aos telespectadores ao conteúdo apresentado. Exemplificando, pode-se televisionar um vídeo onde ao decorrer de sua narrativa os aspectos do ambiente físico de apresentação fossem se adequando ao conteúdo apresentado: regulando a intensidade de iluminação, a temperatura do ambiente, o acionamento de aromatizantes, dentre outros.
@@ -13,7 +16,10 @@ Basicamente, este projeto contém *softwares* que serão executados na TV quanto
 
 Nesta página você encontrará módulos de diversos *middlewares* de TVs digitais. Cada qual haverá explicações e exemplos de sua utilização.
 
-## Saiba mais
+Módulos disponíveis atualemente:
+* [M-Hub-TV-Lua](https://github.com/makleystonlsdi/iDTVModules/tree/master/LuaModule)
+
+# Saiba mais
 [Projeto IoTTV](www.lsdi.ufma.br/~iottv)
 
 [Laboratório de Sistemas Distribuídos Inteligentes (LSDi)](www.lsdi.ufma.br)
