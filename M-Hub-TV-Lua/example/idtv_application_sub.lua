@@ -1,12 +1,12 @@
 -- Imports
 package.path = package.path .. ";../?.lua"
-local lua_module = require("lua_module")
+local m_hub_tv_lua = require("m-hub-tv-lua")
 
 -- Settings to communicate with Broker (M-Hub-TV)
 local settings = {}
 settings.host_mhubtv = "localhost"
-lua_module.setMqttSettings(settings)
-lua_module.setDebug(true)
+m_hub_tv_lua.setMqttSettings(settings)
+m_hub_tv_lua.setDebug(true)
 
 -- Defining the desirable smart objects for the application
 local presencesensor = {}
@@ -18,6 +18,10 @@ end
 function presencesensor:receiveStates(states)
 	print("States received")
 end
+
+local dimmerlamp = {}
+dimmerlamp.environment = 'bedroom'
+dimmerlamp.type = 'dimmerlamp'
 
 -- Defining the interactions supported by the application
 local interactionLeft = {}
@@ -34,6 +38,6 @@ function interactionRight:detectedInteraction(device)
 	print("The user "..device.person.name.." interacted by moving the portable device to the right")
 end
 
-lua_module.setSmartObjectsListener({presencesensor})
-lua_module.setInteractionsListener({interactionLeft, interactionRight})
-lua_module.start()
+m_hub_tv_lua.setSmartObjectsListener({presencesensor, dimmerlamp})
+m_hub_tv_lua.setInteractionsListener({interactionLeft, interactionRight})
+m_hub_tv_lua.start()

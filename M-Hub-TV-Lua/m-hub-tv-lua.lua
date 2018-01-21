@@ -10,9 +10,10 @@ local interactionsSupportedTable = {}
 
 -- Global Variables 
 local mqtt_client
-local time_active_portable_devices = 1.0 --seconds / 10
+local time_active_portable_devices = 3.0 --seconds / 10
 local count_time_active_portable_devices = 0.0
 local debug = false
+local fileName = 'persistence.txt'
 
 --Default topics
 local TOPIC = {}
@@ -35,7 +36,7 @@ TAG.NOTFOUND = 'NOT FOUND'
 -- MQTT Settings
 local mqtt_settings ={
     ['host_mhubtv'] = "",
-    ['id'] = "iDTV",
+    ['id'] = "iDTV"..math.random(os.time())..math.random(os.time()),
     ['port'] = 1883,
     ['will_qos'] = 0,
     ['will_retain'] = 0,
@@ -75,6 +76,34 @@ function updateDateTime(tab, indexObj)
 	tab[indexObj].time = count_time_active_portable_devices
 end
 
+function clone(o)
+	if (type(o)~="table") then
+		return o
+	else
+		local new_o ={}
+		for i,v in pairs(o) do
+			new_o[i] = clone(v)
+		end
+		return new_o
+	end
+end
+
+function persistence()
+	local objs = {}
+	for k, v in pairs(smartObjectsTable) do
+		local o = clone(v)
+		o.receiveNotifications = nil
+		o.receiveStates = nil
+		table.insert(objs, o)
+	end
+	local j = {['smartobjects'] = objs,
+		['portabledevices'] = portableDevicesTable}
+	local file = assert(io.open(fileName, 'w'), TAG.ERROR)
+	file:write(json.encode(j))
+	file:flush()
+	io.close(file)
+end
+
 --If is alive then it returns true, if it does not return false
 function calcDiffClock(timesalved)
 	--print(os.difftime (clockEnd+count_time_active_portable_devices, clockInit))
@@ -112,9 +141,6 @@ end
 -- **************************************
 -- ****** Methods to Smart Objects ******
 -- **************************************
-function getSmartObjectsTable()
-    return smartObjectsTable
-end
 --Returned the index of smart object in table
 function getIndexSmartObjectById(id)
     for k,v in pairs(smartObjectsTable) do
@@ -148,13 +174,24 @@ function getSmartObjectById(id)
 end
 
 --Returned smart objects in table
-function getSmartObjectByType(type)
-    for k,v in pairs(smartObjectsTable) do
-        if(type == v.type) then
-            return v
-        end
-    end
-    return nil
+function filterByType(tab, type)
+	local so = {}
+	for i = 1, #tab do
+		if(type == tab[i].type) then
+			table.insert(so, tab[i])
+		end
+	end
+    return so
+end
+
+function getContextDataTable()
+	local file = assert(io.open(fileName, 'r'), TAG.ERROR)
+	local jj = file:read("*all")
+	local j = json.decode(jj)
+	if(j.smartobjects)then
+		j.smartobjects.filterByType = filterByType
+	end
+	return j
 end
 
 function addSmartObject(obj)
@@ -385,6 +422,7 @@ function checkPortableDevicesAlive()
 				printDebug('portable device not alive: ',v.id)
 			end
 			removePortableDeviceByIndex(k)
+			persistence()
 		end
 	end
 end
@@ -396,11 +434,13 @@ end
 function smartObjectListiner(msg)
 	local indexObj = getIndexSmartObjectById(msg.id)
 	local obj = smartObjectsTable[indexObj]
-	obj:receiveNotifications(obj.functionality.notificationfunctionality)
-	obj:receiveStates(obj.sates)
-	for k, notification in pairs(obj.functionality.notificationfunctionality) do
-		notification.notificationname = nil
-		notification.value = nil
+	if(obj.receiveNotifications) and (obj.receiveStates)then
+		obj:receiveNotifications(obj.functionality.notificationfunctionality)
+		obj:receiveStates(obj.sates)
+		for k, notification in pairs(obj.functionality.notificationfunctionality) do
+			notification.notificationname = nil
+			notification.value = nil
+		end
 	end
 end
 
@@ -445,6 +485,8 @@ function topicsFilter(t, m)
     if(f) then
         f()
     end
+	persistence()
+
 end
 -- **************** end **********
 
@@ -617,35 +659,36 @@ function postSmartObject(obj)
 	mqtt_client:destroy()
 end
 
-local lua_module = {}
+local m_hub_tv_lua = {}
 -- Settings MQTT
-lua_module.setMqttSettings = setMqttSettings
-lua_module.getMqttSettings = getMqttSettings
+m_hub_tv_lua.setMqttSettings = setMqttSettings
+m_hub_tv_lua.getMqttSettings = getMqttSettings
 
 -- Methods related to Smart Objects
-lua_module.getSmartObjectsTable = getSmartObjectsTable
-lua_module.getSmartObjectById = getSmartObjectById
-lua_module.getSmartObjectByType = getSmartObjectByType
+--lua_module.getSmartObjectsTable = getSmartObjectsTable
+m_hub_tv_lua.getSmartObjectById = getSmartObjectById
+m_hub_tv_lua.getSmartObjectByType = getSmartObjectByType
 
 -- Methods related to interactions of the users and portable devices
-lua_module.enableInteractions = enableInteractions
-lua_module.getIndexPortableDeviceById = getIndexPortableDeviceById
-lua_module.getPortableDevicesTable = getPortableDevicesTable
+m_hub_tv_lua.enableInteractions = enableInteractions
+m_hub_tv_lua.getIndexPortableDeviceById = getIndexPortableDeviceById
+--lua_module.getPortableDevicesTable = getPortableDevicesTable
 
 -- Mode debug to LuaModule
-lua_module.setDebug = setDebug
+m_hub_tv_lua.setDebug = setDebug
 
 -- Methods LuaModule
-lua_module.start = start
-lua_module.stop = stop
-lua_module.restart = restart
-lua_module.postSmartObject = postSmartObject
+m_hub_tv_lua.start = start
+m_hub_tv_lua.stop = stop
+m_hub_tv_lua.restart = restart
+m_hub_tv_lua.postSmartObject = postSmartObject
+m_hub_tv_lua.getContextDataTable = getContextDataTable
 
 -- Set listeners
-lua_module.setSmartObjectsListener = setSmartObjectsListener
-lua_module.setInteractionsListener = setInteractionsListener
+m_hub_tv_lua.setSmartObjectsListener = setSmartObjectsListener
+m_hub_tv_lua.setInteractionsListener = setInteractionsListener
 
 -- Remover depois é apenas para testes
---lua_module.postMessage = postMessage
+--m_hub_tv_lua.postMessage = postMessage
 
-return lua_module
+return m_hub_tv_lua

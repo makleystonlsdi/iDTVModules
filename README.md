@@ -1,5 +1,4 @@
-#![IoTTV](http://lsdi.ufma.br/~dannepereira/images/iottv-mini.png)
-
+# ![IoTTV](http://lsdi.ufma.br/~dannepereira/images/iottv-mini.png)
 
 # iDTVModules
 A Internet das Coisas (IoT) está presente em diversos domínios, como indústrias, cidades e casas inteligentes. 
@@ -16,8 +15,8 @@ Para tanto, foi desenvolvida uma infraestrutura de *software* que faz uso de dis
 Mais sobre o projeto e a infraestrutura de *software* pode ser encontrado [aqui](http://www.lsdi.ufma.br/~iottv).
 
 Basicamente, este projeto contém *softwares* que serão executados tanto na TV quanto nos dispositivos móveis. 
-Desde modo, o aplicativo [M-Hub-TV](https://github.com/makleystonlsdi/MHubTV)(Disponível no Git-Hub) é responsável por trocar dados com as coisas da IoT. 
-E esses módulos de TVs, que devem ser importados para as aplicações, são responsáveis por receber os dados do [M-Hub-TV](https://github.com/makleystonlsdi/MHubTV) e armazenar localmente as informações de cada coisa, permitindo que as aplicações possam fazer uso desses dados de contexto.
+Desde modo, o aplicativo [M-Hub-TV](https://github.com/makleystonlsdi/MHubTV) (Disponível no Git-Hub) é responsável por trocar dados com as coisas da IoT. 
+Por outro lado, estes módulos de TVs, que devem ser importados pelas aplicações, são responsáveis por receber os dados do [M-Hub-TV](https://github.com/makleystonlsdi/MHubTV) e armazenar localmente as informações de cada coisa, permitindo que as aplicações possam fazer uso desses dados de contexto.
 
 Nesta página você encontrará módulos de diversos *middlewares* de TVs digitais. 
 Cada um contém explicações e exemplos de sua utilização.
