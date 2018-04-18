@@ -1,31 +1,40 @@
 # ![IoTTV](http://lsdi.ufma.br/~dannepereira/images/iottv-mini.png)
 
-# iDTVModules
-A Internet das Coisas (IoT) está presente em diversos domínios, como indústrias, cidades e casas inteligentes. 
-Este último pode fazer uso da TV para gerenciar as coisas da IoT, permitindo um maior grau de imersão aos telespectadores de um conteúdo apresentado. 
-Exemplificando, pode-se televisionar um vídeo onde ao decorrer de sua narrativa os aspectos do ambiente físico de apresentação fossem se adequando ao conteúdo apresentado: 
-regulando a intensidade de iluminação, a temperatura do ambiente, o acionamento de aromatizantes, dentre outros.
+# Comunication Abstraction and Smart Object Monitor Component - CASMOC
+The Internet of Things (IoT) is present in many domains, such as industries, 
+cities and smart houses. The latter can make use of the TV to manage the things of IoT, 
+allowing a greater degree of immersion to the viewers of a presented content.
+ For example, a video can be televised where, during the course of its narrative, 
+ the aspects of the physical presentation environment were adapted to the presented 
+ content: regulating the intensity of illumination, the temperature of the environment, 
+ the activation of flavorings, among others.
 
-Nesse contexto, o projeto [IoTTV](http://www.lsdi.ufma.br/~iottv) busca convergir ambas áreas com objetivo de:
-* Permitir que a aplicação em execução na TV possa alterar aspectos do ambiente físico; 
-* Permitir que o conteúdo apresentado na TV possa estar ciênte de dados de contexto do ambiente físico de apresentação;
-* Permitir que o telespectador possa interagir por diversos modos com a aplicação em execução na TV.
+In this context, the project [IoTTV](http://www.lsdi.ufma.br/~iottv) seeks to 
+converge both areas with the objective of:
+* Allow the application running on the TV to change aspects of the physical environment;
+* Allow content displayed on TV to be aware of context data of the physical presentation environment;
+* Allow the viewer to interact in various ways with the application running on the TV.
 
-Para tanto, foi desenvolvida uma infraestrutura de *software* que faz uso de dispositivos móveis (*e. g. smartphones* e *tablets*) para intermediar a comunicação entre a aplicação de TV e as coisas da IoT. 
-Mais sobre o projeto e a infraestrutura de *software* pode ser encontrado [aqui](http://www.lsdi.ufma.br/~iottv).
+To this end, a software infrastructure has been developed that makes use of 
+mobile devices (and smartphones and tablets) to mediate the
+ communication between the TV application and the things of IoT. More about the
+  project and infrastructure of software can be found [here](http://www.lsdi.ufma.br/~iottv).
+  
+Basically, this project contains software that will run on both TV and mobile devices. 
+Since then, the [SDPEU](https://github.com/makleystonlsdi/SDPEU) application 
+(Available in the Git-Hub) is responsible for exchanging data with IoT stuff. 
+On the other hand, these TV modules, which must be imported by the applications, 
+are responsible for receiving the SDPEU data and locally storing the information 
+of each thing, allowing the applications to make use of this context data.
 
-Basicamente, este projeto contém *softwares* que serão executados tanto na TV quanto nos dispositivos móveis. 
-Desde modo, o aplicativo [M-Hub-TV](https://github.com/makleystonlsdi/MHubTV) (Disponível no Git-Hub) é responsável por trocar dados com as coisas da IoT. 
-Por outro lado, estes módulos de TVs, que devem ser importados pelas aplicações, são responsáveis por receber os dados do [M-Hub-TV](https://github.com/makleystonlsdi/MHubTV) e armazenar localmente as informações de cada coisa, permitindo que as aplicações possam fazer uso desses dados de contexto.
+On this page you will find modules from various digital 
+TV middleware. Each contains explanations and examples of its use.
 
-Nesta página você encontrará módulos de diversos *middlewares* de TVs digitais. 
-Cada um contém explicações e exemplos de sua utilização.
+Currently Available Modules:
+* [CASMOC (Lua)](https://github.com/makleystonlsdi/iDTVModules/tree/master/CASMOC)
 
-Módulos disponíveis atualemente:
-* [M-Hub-TV-Lua](https://github.com/makleystonlsdi/iDTVModules/tree/master/LuaModule)
-
-# Saiba mais
-[Projeto IoTTV](http://www.lsdi.ufma.br/~iottv)
+# More
+[IoTTV Project](http://www.lsdi.ufma.br/~iottv)
 
 [Laboratório de Sistemas Distribuídos Inteligentes (LSDi)](http://www.lsdi.ufma.br)
 
